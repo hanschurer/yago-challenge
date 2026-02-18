@@ -1,6 +1,11 @@
-// import React from "react";
 import { NavLink } from "react-router-dom";
-import { Home, CreditCard, LayoutDashboard, Settings } from "lucide-react";
+import {
+  Home,
+  CreditCard,
+  LayoutDashboard,
+  Settings,
+  Activity,
+} from "lucide-react";
 
 export function Sidebar() {
   return (
@@ -25,9 +30,17 @@ export function Sidebar() {
       <nav style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <NavLink
           to="/"
+          end
           className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
         >
           <Home size={20} />
+          Home
+        </NavLink>
+        <NavLink
+          to="/dashboard"
+          className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+        >
+          <Activity size={20} />
           Dashboard
         </NavLink>
         <NavLink

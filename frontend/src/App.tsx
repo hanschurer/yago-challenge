@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DashboardLayout } from "./layouts/DashboardLayout";
+import { HomePage } from "./pages/HomePage";
 import { Dashboard } from "./pages/Dashboard";
 import { CardsPage } from "./pages/CardsPage";
-import { TransactionsPage } from "./pages/Transactions"; // Renamed to TransactionsPage to match export
+import { TransactionsPage } from "./pages/Transactions";
 import "./index.css";
 
 function App() {
@@ -10,7 +11,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<HomePage />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="cards" element={<CardsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
