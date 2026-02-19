@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 import { db } from "./db";
 import { cards, transactions, users, cardStatusEnum } from "./db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -11,7 +14,22 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Directory for generated large files
+const FILES_DIR = path.resolve(__dirname, "../uploads");
+if (!fs.existsSync(FILES_DIR)) {
+  fs.mkdirSync(FILES_DIR, { recursive: true });
+}
+
+app.use(
+  cors({
+    exposedHeaders: [
+      "Content-Range",
+      "Accept-Ranges",
+      "Content-Length",
+      "X-File-Hash",
+    ],
+  }),
+);
 app.use(express.json());
 
 // Validation schemas
@@ -239,6 +257,179 @@ app.post("/api/seed", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("Fintech API Running");
 });
+
+// ==========================================
+// Large File Resumable Download Endpoints
+// ==========================================
+
+// Generate a large test file
+app.post("/api/files/generate", async (req, res) => {
+  try {
+    const { sizeMB = 100, filename } = req.body;
+    const safeName = filename || `testfile_${sizeMB}MB_${Date.now()}.bin`;
+    const filePath = path.join(FILES_DIR, safeName);
+
+    // Check if file already exists
+    if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      const hash = await computeFileHash(filePath);
+      return res.json({
+        filename: safeName,
+        size: stat.size,
+        hash,
+        message: "File already exists",
+      });
+    }
+
+    const totalBytes = sizeMB * 1024 * 1024;
+    const chunkSize = 1024 * 1024; // Write 1MB at a time
+    const writeStream = fs.createWriteStream(filePath);
+
+    let written = 0;
+    const writeChunk = () => {
+      while (written < totalBytes) {
+        const remaining = totalBytes - written;
+        const size = Math.min(chunkSize, remaining);
+        const buf = crypto.randomBytes(size);
+        const canContinue = writeStream.write(buf);
+        written += size;
+        if (!canContinue) {
+          writeStream.once("drain", writeChunk);
+          return;
+        }
+      }
+      writeStream.end();
+    };
+
+    writeChunk();
+
+    writeStream.on("finish", async () => {
+      const hash = await computeFileHash(filePath);
+      res.json({
+        filename: safeName,
+        size: totalBytes,
+        hash,
+        message: "File generated successfully",
+      });
+    });
+
+    writeStream.on("error", (err) => {
+      console.error("File write error:", err);
+      res.status(500).json({ error: "Failed to generate file" });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to generate file" });
+  }
+});
+
+// Get file info (size + hash)
+app.get("/api/files/:filename/info", async (req, res) => {
+  try {
+    const filePath = path.join(FILES_DIR, req.params.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    const stat = fs.statSync(filePath);
+    const hash = await computeFileHash(filePath);
+    res.json({
+      filename: req.params.filename,
+      size: stat.size,
+      hash,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get file info" });
+  }
+});
+
+// List available files
+app.get("/api/files", (req, res) => {
+  try {
+    if (!fs.existsSync(FILES_DIR)) {
+      return res.json([]);
+    }
+    const files = fs.readdirSync(FILES_DIR).map((name) => {
+      const stat = fs.statSync(path.join(FILES_DIR, name));
+      return { filename: name, size: stat.size, createdAt: stat.birthtime };
+    });
+    res.json(files);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to list files" });
+  }
+});
+
+// Download file with Range support (resumable download)
+app.get("/api/files/:filename", (req, res) => {
+  try {
+    const filePath = path.join(FILES_DIR, req.params.filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+
+    // Always advertise Range support
+    res.setHeader("Accept-Ranges", "bytes");
+
+    const rangeHeader = req.headers.range;
+
+    if (rangeHeader) {
+      // Parse Range header: "bytes=start-end"
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      // Validate range
+      if (start >= fileSize || end >= fileSize || start > end) {
+        res.status(416).setHeader("Content-Range", `bytes */${fileSize}`);
+        return res.end();
+      }
+
+      const chunkSize = end - start + 1;
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader("Content-Length", chunkSize);
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${req.params.filename}"`,
+      );
+
+      const stream = fs.createReadStream(filePath, { start, end });
+      stream.pipe(res);
+    } else {
+      // Full file download
+      res.setHeader("Content-Length", fileSize);
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${req.params.filename}"`,
+      );
+
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to download file" });
+  }
+});
+
+// Helper: compute SHA-256 hash of a file
+function computeFileHash(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", reject);
+  });
+}
 
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);

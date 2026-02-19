@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Settings,
   Activity,
+  Download,
 } from "lucide-react";
 
 export function Sidebar() {
@@ -56,6 +57,13 @@ export function Sidebar() {
         >
           <LayoutDashboard size={20} />
           Transactions
+        </NavLink>
+        <NavLink
+          to="/download"
+          className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+        >
+          <Download size={20} />
+          Download
         </NavLink>
       </nav>
 

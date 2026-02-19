@@ -4,6 +4,7 @@ import { HomePage } from "./pages/HomePage";
 import { Dashboard } from "./pages/Dashboard";
 import { CardsPage } from "./pages/CardsPage";
 import { TransactionsPage } from "./pages/Transactions";
+import { DownloadPage } from "./pages/DownloadPage";
 import "./index.css";
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="cards" element={<CardsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="download" element={<DownloadPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

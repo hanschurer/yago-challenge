@@ -203,6 +203,10 @@ export function HomePage() {
               View a transaction history with filtering and receipt upload
             </li>
             <li>See a real-time dashboard with spending trends</li>
+            <li>
+              <strong>NEW:</strong> Resumable large file downloads (compliance
+              reports)
+            </li>
           </ul>
         </div>
       </section>
@@ -492,6 +496,20 @@ export function HomePage() {
               }}
             >
               Browse transaction history
+            </p>
+          </div>
+          <ArrowRight size={20} color="var(--text-secondary)" />
+        </a>
+        <a href="/download" className="quick-link glass-panel">
+          <div>
+            <h3 style={{ marginBottom: "0.25rem" }}>Downloads</h3>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: "0.85rem",
+              }}
+            >
+              Test resumable file downloads
             </p>
           </div>
           <ArrowRight size={20} color="var(--text-secondary)" />
