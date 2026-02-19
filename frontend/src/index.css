@@ -309,6 +309,7 @@ button {
 .step-card:nth-child(6) { animation-delay: 0.3s; }
 .step-card:nth-child(7) { animation-delay: 0.35s; }
 .step-card:nth-child(8) { animation-delay: 0.4s; }
+.step-card:nth-child(9) { animation-delay: 0.45s; }
 
 @keyframes fadeInUp {
   from {

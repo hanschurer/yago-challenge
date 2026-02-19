@@ -65,6 +65,13 @@ export function Sidebar() {
           <Download size={20} />
           Download
         </NavLink>
+        <NavLink
+          to="/realtime"
+          className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+        >
+          <Activity size={20} />
+          Realtime
+        </NavLink>
       </nav>
 
       <div style={{ marginTop: "auto" }}>

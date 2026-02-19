@@ -5,6 +5,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { CardsPage } from "./pages/CardsPage";
 import { TransactionsPage } from "./pages/Transactions";
 import { DownloadPage } from "./pages/DownloadPage";
+import { RealtimePage } from "./pages/RealtimePage";
 import "./index.css";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="cards" element={<CardsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="download" element={<DownloadPage />} />
+          <Route path="realtime" element={<RealtimePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

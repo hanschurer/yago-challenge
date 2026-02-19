@@ -116,3 +116,23 @@ export async function downloadFileChunk(
   const contentRange = response.headers.get("Content-Range");
   return { data, contentRange };
 }
+
+// ===== Real-time API =====
+
+export async function toggleSimulation(active: boolean, intervalMs = 2000) {
+  const response = await fetch(`${API_URL}/realtime/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ active, intervalMs }),
+  });
+  if (!response.ok) throw new Error("Failed to toggle simulation");
+  return response.json();
+}
+
+export async function pollTransactions(afterId: number): Promise<any[]> {
+  const response = await fetch(`${API_URL}/realtime/poll?afterId=${afterId}`);
+  if (!response.ok) throw new Error("Failed to poll transactions");
+  return response.json();
+}
+
+export const getSSEUrl = () => `${API_URL}/realtime/stream`;

@@ -207,6 +207,9 @@ export function HomePage() {
               <strong>NEW:</strong> Resumable large file downloads (compliance
               reports)
             </li>
+            <li>
+              <strong>NEW:</strong> Real-time updates (Polling vs SSE)
+            </li>
           </ul>
         </div>
       </section>
@@ -400,6 +403,23 @@ export function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Step 9 */}
+          <div className="step-card glass-panel">
+            <div className="step-number">9</div>
+            <div className="step-content">
+              <h3 className="step-title">
+                Bonus: Real-time & Advanced Features
+              </h3>
+              <p className="step-desc">
+                Explore the advanced implementations for{" "}
+                <strong>Resumable Downloads</strong> (HTTP Range) and{" "}
+                <strong>Real-time Updates</strong> (SSE vs Polling). Check the{" "}
+                <code>/download</code> and <code>/realtime</code> routes for
+                reference.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -510,6 +530,20 @@ export function HomePage() {
               }}
             >
               Test resumable file downloads
+            </p>
+          </div>
+          <ArrowRight size={20} color="var(--text-secondary)" />
+        </a>
+        <a href="/realtime" className="quick-link glass-panel">
+          <div>
+            <h3 style={{ marginBottom: "0.25rem" }}>Real-time</h3>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: "0.85rem",
+              }}
+            >
+              Polling vs SSE
             </p>
           </div>
           <ArrowRight size={20} color="var(--text-secondary)" />

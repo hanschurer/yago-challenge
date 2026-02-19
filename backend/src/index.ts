@@ -4,15 +4,22 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { EventEmitter } from "events";
 import { db } from "./db";
 import { cards, transactions, users, cardStatusEnum } from "./db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, gt } from "drizzle-orm";
 import { z } from "zod";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Event Emitter for Real-time updates
+const eventBus = new EventEmitter();
+
+// Simulation State
+let simulationInterval: NodeJS.Timeout | null = null;
 
 // Directory for generated large files
 const FILES_DIR = path.resolve(__dirname, "../uploads");
@@ -430,6 +437,137 @@ function computeFileHash(filePath: string): Promise<string> {
     stream.on("error", reject);
   });
 }
+
+// ==========================================
+// Real-time Simulation & SSE Endpoints
+// ==========================================
+
+// Helper to simulate a transaction
+const createRandomTransaction = async () => {
+  try {
+    // Pick a random card
+    const allCards = await db
+      .select()
+      .from(cards)
+      .where(eq(cards.status, "ACTIVE"));
+    if (allCards.length === 0) return;
+
+    const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
+    const amount = Math.floor(Math.random() * 5000) + 100; // 1.00 to 50.00
+    const merchants = [
+      "Uber",
+      "Netflix",
+      "Amazon",
+      "Starbucks",
+      "Spotify",
+      "Apple",
+      "Google Cloud",
+    ];
+    const merchantName =
+      merchants[Math.floor(Math.random() * merchants.length)];
+
+    // Check limit
+    if (randomCard.spentAmount + amount > randomCard.limitAmount) {
+      await db.insert(transactions).values({
+        cardId: randomCard.id,
+        merchantName,
+        amount,
+        status: "DECLINED",
+      });
+      // Emit even for declined (optional)
+      return;
+    }
+
+    const [newTx] = await db
+      .insert(transactions)
+      .values({
+        cardId: randomCard.id,
+        merchantName,
+        amount,
+        status: "COMPLETED",
+      })
+      .returning();
+
+    // Update balance
+    await db
+      .update(cards)
+      .set({ spentAmount: randomCard.spentAmount + amount })
+      .where(eq(cards.id, randomCard.id));
+
+    // Emit event for SSE
+    eventBus.emit("new-transaction", newTx);
+    console.log(
+      `[Simulation] Created tx: ${newTx.id} for card ${randomCard.last4}`,
+    );
+  } catch (err) {
+    console.error("[Simulation] Error:", err);
+  }
+};
+
+// Start/Stop Simulation
+app.post("/api/realtime/simulate", (req, res) => {
+  const { active, intervalMs = 2000 } = req.body;
+
+  if (active) {
+    if (simulationInterval) clearInterval(simulationInterval);
+    console.log(`[Simulation] Starting with interval ${intervalMs}ms`);
+    simulationInterval = setInterval(createRandomTransaction, intervalMs);
+    res.json({ message: "Simulation started", active: true });
+  } else {
+    if (simulationInterval) {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+    }
+    console.log("[Simulation] Stopped");
+    res.json({ message: "Simulation stopped", active: false });
+  }
+});
+
+// Polling Endpoint: Get transactions after a specific ID
+app.get("/api/realtime/poll", async (req, res) => {
+  try {
+    const afterId = parseInt(req.query.afterId as string) || 0;
+    const newTransactions = await db
+      .select()
+      .from(transactions)
+      .where(gt(transactions.id, afterId))
+      .orderBy(desc(transactions.id));
+
+    res.json(newTransactions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Polling failed" });
+  }
+});
+
+// SSE Endpoint: Stream new transactions
+app.get("/api/realtime/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const sendEvent = (data: any) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Initial connection message
+  sendEvent({ type: "connected", timestamp: Date.now() });
+
+  // Listener function
+  const onNewTransaction = (tx: any) => {
+    sendEvent({ type: "transaction", data: tx });
+  };
+
+  // Subscribe
+  eventBus.on("new-transaction", onNewTransaction);
+
+  // Cleanup on disconnect
+  req.on("close", () => {
+    eventBus.off("new-transaction", onNewTransaction);
+    res.end();
+  });
+});
 
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
